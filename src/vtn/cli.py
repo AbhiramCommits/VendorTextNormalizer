@@ -6,6 +6,8 @@ from vtn.bench import run_benchmarks
 from vtn.ingest_pandas import load_vendor_a, load_vendor_b, normalize_schema
 from vtn.resolve import build_crosswalk, resolution_report, build_panel
 from vtn.text_features import attach_to_panel
+from vtn.qc import run_all
+from vtn.discrepancy import generate_findings_report
 
 def main():
     parser = argparse.ArgumentParser(description="VendorTextNormalizer CLI")
@@ -49,9 +51,20 @@ def main():
         summary = attach_to_panel()
         print(f"Features complete: {summary}")
     elif args.command == "qc":
-        print("Running qc...")
+        print("Running quality check gate...")
+        passed, checks = run_all()
+        for c in checks:
+            status = "PASS" if c['passed'] else "FAIL"
+            print(f" - {c['name']}: {status} (observed: {c['observed']}, threshold: {c['threshold']})")
+        if not passed:
+            print("QC Gate FAILED.")
+            sys.exit(1)
+        else:
+            print("QC Gate PASSED.")
     elif args.command == "report":
-        print("Running report...")
+        print("Generating findings report...")
+        path = generate_findings_report()
+        print(f"Findings report written to {path}")
     elif args.command == "bench":
         print("Running bench...")
         res = run_benchmarks()
@@ -66,7 +79,12 @@ def main():
         resolution_report(cw, df_a, df_b)
         build_panel(df_a, df_b, cw)
         attach_to_panel()
-        print("All steps completed successfully.")
+        passed, _ = run_all()
+        generate_findings_report()
+        if not passed:
+            print("Pipeline completed but QC failed!")
+            sys.exit(1)
+        print("All steps completed successfully and QC passed.")
     else:
         parser.print_help()
         sys.exit(1)
