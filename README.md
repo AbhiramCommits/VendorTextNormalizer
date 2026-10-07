@@ -49,13 +49,13 @@ python -m vtn qc
 - **Vendor A Rows Ingested**: 101,446
 - **Vendor B Rows Ingested**: 18,400
 - **Total Ingested Rows**: 119,846
-- **Pandas Wall Time**: 25.4312 seconds
+- **Pandas Wall Time**: 25.6937 seconds
 - **Pandas Peak Memory**: 27.54 MiB
-- **Pandas Throughput**: 4,712.56 rows/sec
-- **Polars Wall Time**: 0.2737 seconds
+- **Pandas Throughput**: 4,664.41 rows/sec
+- **Polars Wall Time**: 0.2716 seconds
 - **Polars Peak Memory**: 0.01 MiB
-- **Polars Throughput**: 437,888.25 rows/sec
-- **Polars/Pandas Speedup Ratio**: 92.92x
+- **Polars Throughput**: 441,240.93 rows/sec
+- **Polars/Pandas Speedup Ratio**: 94.6x
 
 ### Entity Resolution
 - **Total Vendor A Entities**: 200
@@ -92,8 +92,13 @@ python -m vtn qc
 - `duplicate_key_divergence`: 1,446
 
 ### Test Coverage
-- **Test Count**: 6 unit test suites passing
-- **Coverage**: Verified via `pytest-cov`
+- **Test Count**: 6 tests passing across 5 suites
+- **Coverage**: 31% (`pytest -q --cov=src/vtn --cov-report=term-missing`)
+- **Type check**: `python -m mypy src/vtn` -> Success: no issues found in 11 source files (pandas/polars stubs ignored, documented in `pyproject.toml`)
+
+### Reproducibility
+- Running `python -m vtn gen --seed 7` twice produces identical raw feeds and injection counts.
+- Running `python -m vtn resolve` twice produces a byte-identical `data/out/resolution.json` (verified with `diff`).
 
 ---
 

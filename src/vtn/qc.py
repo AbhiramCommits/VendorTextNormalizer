@@ -103,6 +103,7 @@ def check_distribution_drift(df: pd.DataFrame) -> dict:
     }
 
 def run_all(df: pd.DataFrame = None) -> tuple[bool, list[dict]]:
+    """Runs every quality check, writes qc_report.json and returns (all_passed, results)."""
     out_dir = Path("data/out")
     if df is None:
         panel_path = out_dir / "panel.parquet"

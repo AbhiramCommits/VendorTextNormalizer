@@ -1,6 +1,9 @@
 import argparse
 import sys
+import time
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 from vtn.gen import generate
 from vtn.bench import run_benchmarks
 from vtn.ingest_pandas import load_vendor_a, load_vendor_b, normalize_schema
@@ -9,7 +12,30 @@ from vtn.text_features import attach_to_panel
 from vtn.qc import run_all
 from vtn.discrepancy import generate_findings_report
 
-def main():
+
+@contextmanager
+def _stage(name: str) -> Iterator[None]:
+    """Context manager that prints the wall-clock time for a named pipeline stage."""
+    t0 = time.perf_counter()
+    print(f"[stage] {name} ...")
+    try:
+        yield
+    finally:
+        print(f"[stage] {name} done in {time.perf_counter() - t0:.3f}s")
+
+
+def _run_resolve() -> None:
+    """Loads both vendors, resolves entities and writes the normalized panel."""
+    df_a = normalize_schema(load_vendor_a(Path("data/raw/vendor_a.parquet")), "vendor_a")
+    df_b = normalize_schema(load_vendor_b(Path("data/raw/vendor_b.jsonl")), "vendor_b")
+    cw = build_crosswalk(df_a, df_b)
+    rep = resolution_report(cw, df_a, df_b)
+    panel = build_panel(df_a, df_b, cw)
+    print(f"Resolution complete: match_rate={rep['match_rate']}, panel_rows={len(panel)}")
+
+
+def main() -> None:
+    """Entry point for the ``python -m vtn`` CLI."""
     parser = argparse.ArgumentParser(description="VendorTextNormalizer CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -24,63 +50,57 @@ def main():
     subparsers.add_parser("qc", help="Run quality check gate")
     subparsers.add_parser("report", help="Generate findings report")
     subparsers.add_parser("bench", help="Run pandas vs polars benchmarks")
-    
+
     all_parser = subparsers.add_parser("all", help="Run full pipeline end to end")
     all_parser.add_argument("--seed", type=int, default=42, help="Random seed")
 
     args = parser.parse_args()
 
     if args.command == "gen":
-        print(f"Generating raw feeds with seed={args.seed}...")
-        res = generate(seed=args.seed, n_entities=args.entities, n_days=args.days)
-        print(f"Generated successfully: {res}")
+        with _stage("gen"):
+            res = generate(seed=args.seed, n_entities=args.entities, n_days=args.days)
+            print(f"Generated successfully: {res}")
     elif args.command == "ingest":
-        print("Running ingest & benchmarks...")
-        run_benchmarks()
-        print("Ingest & benchmark complete.")
+        with _stage("ingest+bench"):
+            run_benchmarks()
     elif args.command == "resolve":
-        print("Running entity resolution & panel construction...")
-        df_a = normalize_schema(load_vendor_a(Path("data/raw/vendor_a.parquet")), "vendor_a")
-        df_b = normalize_schema(load_vendor_b(Path("data/raw/vendor_b.jsonl")), "vendor_b")
-        cw = build_crosswalk(df_a, df_b)
-        rep = resolution_report(cw, df_a, df_b)
-        panel = build_panel(df_a, df_b, cw)
-        print(f"Resolution complete: match_rate={rep['match_rate']}, panel_rows={len(panel)}")
+        with _stage("resolve"):
+            _run_resolve()
     elif args.command == "features":
-        print("Extracting textual features & joining to panel...")
-        summary = attach_to_panel()
-        print(f"Features complete: {summary}")
+        with _stage("features"):
+            summary = attach_to_panel()
+            print(f"Features complete: {summary}")
     elif args.command == "qc":
-        print("Running quality check gate...")
-        passed, checks = run_all()
-        for c in checks:
-            status = "PASS" if c['passed'] else "FAIL"
-            print(f" - {c['name']}: {status} (observed: {c['observed']}, threshold: {c['threshold']})")
+        with _stage("qc"):
+            passed, checks = run_all()
+            for c in checks:
+                status = "PASS" if c['passed'] else "FAIL"
+                print(f" - {c['name']}: {status} (observed: {c['observed']}, threshold: {c['threshold']})")
         if not passed:
             print("QC Gate FAILED.")
             sys.exit(1)
-        else:
-            print("QC Gate PASSED.")
+        print("QC Gate PASSED.")
     elif args.command == "report":
-        print("Generating findings report...")
-        path = generate_findings_report()
-        print(f"Findings report written to {path}")
+        with _stage("report"):
+            path = generate_findings_report()
+            print(f"Findings report written to {path}")
     elif args.command == "bench":
-        print("Running bench...")
-        res = run_benchmarks()
-        print(f"Benchmark results: {res}")
+        with _stage("bench"):
+            res = run_benchmarks()
+            print(f"Benchmark results: {res}")
     elif args.command == "all":
-        print(f"Running all with seed={args.seed}...")
-        generate(seed=args.seed)
-        run_benchmarks()
-        df_a = normalize_schema(load_vendor_a(Path("data/raw/vendor_a.parquet")), "vendor_a")
-        df_b = normalize_schema(load_vendor_b(Path("data/raw/vendor_b.jsonl")), "vendor_b")
-        cw = build_crosswalk(df_a, df_b)
-        resolution_report(cw, df_a, df_b)
-        build_panel(df_a, df_b, cw)
-        attach_to_panel()
-        passed, _ = run_all()
-        generate_findings_report()
+        with _stage("gen"):
+            generate(seed=args.seed)
+        with _stage("bench"):
+            run_benchmarks()
+        with _stage("resolve"):
+            _run_resolve()
+        with _stage("features"):
+            attach_to_panel()
+        with _stage("qc"):
+            passed, _ = run_all()
+        with _stage("report"):
+            generate_findings_report()
         if not passed:
             print("Pipeline completed but QC failed!")
             sys.exit(1)
@@ -88,6 +108,7 @@ def main():
     else:
         parser.print_help()
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

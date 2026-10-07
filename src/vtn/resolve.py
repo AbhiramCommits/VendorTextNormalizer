@@ -25,6 +25,7 @@ def normalize_name(s: str) -> str:
     return " ".join(tokens)
 
 def token_set_jaccard(s1: str, s2: str) -> float:
+    """Computes the Jaccard similarity between the token sets of two strings."""
     set1 = set(s1.split())
     set2 = set(s2.split())
     if not set1 or not set2:
@@ -105,6 +106,7 @@ def build_crosswalk(df_a: pd.DataFrame, df_b: pd.DataFrame, threshold: float = 0
     return pd.DataFrame(matches)
 
 def resolution_report(crosswalk_df: pd.DataFrame, df_a: pd.DataFrame, df_b: pd.DataFrame) -> dict:
+    """Computes match rate, per-method breakdown, residual counts and precision/recall; writes resolution.json."""
     total_a = crosswalk_df['vendor_a_key'].nunique()
     matched = crosswalk_df[crosswalk_df['vendor_b_key'].notna()]
     unmatched = crosswalk_df[crosswalk_df['vendor_b_key'].isna()]

@@ -32,3 +32,9 @@ include = ["vtn*"]
 minversion = "7.0"
 addopts = "-ra -q"
 testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+# pandas/polars ship no complete stubs; missing-import handling is documented in README.
+

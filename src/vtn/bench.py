@@ -2,12 +2,17 @@ import time
 import tracemalloc
 import json
 from pathlib import Path
+from typing import Dict, Any
 import pandas as pd
 import polars as pl
 from vtn.ingest_pandas import load_vendor_a, load_vendor_b, normalize_schema as normalize_pandas, assert_paths_agree
 from vtn.ingest_polars import load_vendor_a_pl, load_vendor_b_pl, normalize_schema_pl
 
-def run_benchmarks() -> dict:
+def run_benchmarks() -> Dict[str, Any]:
+    """Runs performance benchmarks comparing pandas and polars ingest pipelines over raw vendor feeds.
+    
+    Measures wall-clock time (3 repeats, median), peak memory via tracemalloc, and compute throughput.
+    """
     raw_dir = Path("data/raw")
     out_dir = Path("data/out")
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -15,7 +20,6 @@ def run_benchmarks() -> dict:
     a_path = raw_dir / "vendor_a.parquet"
     b_path = raw_dir / "vendor_b.jsonl"
 
-    # Pandas benchmark (3 repeats, median)
     pd_times = []
     pd_mem_peaks = []
     pd_rows = 0
@@ -41,7 +45,6 @@ def run_benchmarks() -> dict:
     pd_median_mem = sorted(pd_mem_peaks)[1]
     pd_rows_sec = pd_rows / pd_median_time
 
-    # Polars benchmark (3 repeats, median)
     pl_times = []
     pl_mem_peaks = []
     pl_rows = 0
@@ -67,10 +70,9 @@ def run_benchmarks() -> dict:
     pl_median_mem = sorted(pl_mem_peaks)[1]
     pl_rows_sec_pl = pl_rows / pl_median_time
 
-    # Parity check
     assert_paths_agree(df_pd, df_pl.to_pandas())
 
-    results = {
+    results: Dict[str, Any] = {
         "pandas": {
             "time_seconds": round(pd_median_time, 4),
             "peak_mib": round(pd_median_mem, 2),
@@ -86,7 +88,6 @@ def run_benchmarks() -> dict:
         "speedup_ratio": round(pd_median_time / pl_median_time, 2) if pl_median_time > 0 else 1.0
     }
 
-    # Write JSON and Markdown table
     json_path = out_dir / "bench.json"
     json_path.write_text(json.dumps(results, indent=2))
 

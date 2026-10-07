@@ -52,8 +52,9 @@ def apply_negation(tokens: list[str], window: int = 3) -> list[str]:
     return out
 
 def load_lexicon() -> dict:
+    """Loads the checked-in finance sentiment lexicon into a dict of category -> set of words."""
     lex_path = Path("src/vtn/lexicons/finance_sentiment.tsv")
-    lexicon = {"positive": set(), "negative": set(), "uncertainty": set(), "litigious": set()}
+    lexicon: dict[str, set[str]] = {"positive": set(), "negative": set(), "uncertainty": set(), "litigious": set()}
     if lex_path.exists():
         for line in lex_path.read_text().splitlines():
             parts = line.split("\t")
@@ -64,6 +65,7 @@ def load_lexicon() -> dict:
     return lexicon
 
 def extract_doc_features(text: str, lexicon: dict) -> dict:
+    """Extracts token, vocabulary, ttr, lexicon and negation-adjusted sentiment features for one document."""
     cleaned = clean_text(text)
     raw_tokens = tokenize(cleaned)
     neg_tokens = apply_negation(raw_tokens)
@@ -99,6 +101,7 @@ def extract_doc_features(text: str, lexicon: dict) -> dict:
     }
 
 def attach_to_panel() -> dict:
+    """Aggregates document features to (entity_id, date), forward-fills onto the panel and writes panel_features.parquet."""
     out_dir = Path("data/out")
     panel_path = out_dir / "panel.parquet"
     vendor_c_path = Path("data/raw/vendor_c.jsonl")

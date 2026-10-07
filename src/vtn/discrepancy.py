@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 
 def classify_discrepancies() -> dict:
+    """Classifies field disagreements between the two numeric vendors into named classes; writes discrepancies.json."""
     out_dir = Path("data/out")
     panel_path = out_dir / "panel.parquet"
     if not panel_path.exists():
@@ -51,6 +52,7 @@ def classify_discrepancies() -> dict:
     return result
 
 def generate_findings_report():
+    """Renders FINDINGS.md from the measured discrepancy JSON artifacts."""
     out_dir = Path("data/out")
     disc = classify_discrepancies()
     

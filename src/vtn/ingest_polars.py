@@ -2,23 +2,26 @@ import polars as pl
 from pathlib import Path
 
 def load_vendor_a_pl(path: Path) -> pl.DataFrame:
+    """Loads Vendor A numeric feed (Parquet or CSV) into a Polars DataFrame."""
     if str(path).endswith('.parquet'):
         return pl.read_parquet(path)
     else:
         return pl.read_csv(path)
 
 def load_vendor_b_pl(path: Path) -> pl.DataFrame:
+    """Loads Vendor B numeric feed (JSONL) into a Polars DataFrame."""
     return pl.read_ndjson(path)
 
 def load_vendor_c_pl(path: Path) -> pl.DataFrame:
+    """Loads Vendor C free-text feed (JSONL) into a Polars DataFrame."""
     return pl.read_ndjson(path)
 
 def parse_date_polars(col: pl.Expr) -> pl.Expr:
-    # Polars date parsing handling ISO, US, and quarters
-    # We can cast or apply string parsing
+    """Parses a Polars string column containing ISO, US or YYYYQn dates to YYYY-MM-DD."""
     return col.map_elements(lambda x: _parse_one_date(x), return_dtype=pl.Utf8)
 
-def _parse_one_date(val) -> str:
+def _parse_one_date(val: object) -> str | None:
+    """Parses a single date value in ISO, US (MM/DD/YYYY) or YYYYQn format to YYYY-MM-DD."""
     if val is None:
         return None
     val_str = str(val).strip()
@@ -55,6 +58,15 @@ def _parse_one_date(val) -> str:
         return None
 
 def normalize_schema_pl(df: pl.DataFrame, source: str) -> pl.DataFrame:
+    """Normalizes a vendor frame (polars) to the canonical schema.
+
+    Args:
+        df: Raw vendor dataframe.
+        source: Either ``"vendor_a"`` or ``"vendor_b"``.
+
+    Returns:
+        DataFrame with columns entity_key, entity_name_raw, date, value, unit, source.
+    """
     df = df.rename({c: c.strip().lower() for c in df.columns})
     
     if source == "vendor_a":

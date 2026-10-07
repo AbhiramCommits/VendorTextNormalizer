@@ -12,7 +12,7 @@ def generate(seed: int, n_entities: int = 200, n_days: int = 500, out_dir: Path 
     start_date = datetime(2022, 1, 3)
     # generate business days roughly
     current = start_date
-    dates = []
+    dates: List[str] = []
     for _ in range(n_days):
         while current.weekday() >= 5: # skip weekends
             current += timedelta(days=1)
@@ -28,7 +28,7 @@ def generate(seed: int, n_entities: int = 200, n_days: int = 500, out_dir: Path 
         "TYRELL CORP", "WEYLAND YUTANI"
     ]
     
-    entities = []
+    entities: List[Dict[str, Any]] = []
     for i in range(n_entities):
         series_id = f"SER_{i:04d}"
         cik = f"CIK{i:09d}"
@@ -69,11 +69,11 @@ def generate(seed: int, n_entities: int = 200, n_days: int = 500, out_dir: Path 
     missing_b_count = int(n_entities * 0.08)
     missing_b_indices = set(random.sample(range(n_entities), missing_b_count))
 
-    vendor_a_rows = []
-    vendor_b_rows = []
-    vendor_c_rows = []
+    vendor_a_rows: List[Dict[str, Any]] = []
+    vendor_b_rows: List[Dict[str, Any]] = []
+    vendor_c_rows: List[Dict[str, Any]] = []
 
-    injected_counts = {
+    injected_counts: Dict[str, Any] = {
         "name_variants": 0,
         "whitespace_noise": 0,
         "date_formats": {"ISO": 0, "US": 0, "QUARTER": 0},
@@ -130,7 +130,7 @@ def generate(seed: int, n_entities: int = 200, n_days: int = 500, out_dir: Path 
                 injected_counts["name_variants"] += 1
 
             # Nulls injection (~2-4%)
-            val_a = val
+            val_a: float | None = val
             if random.random() < 0.03:
                 val_a = None
                 injected_counts["nulls"] += 1
@@ -156,7 +156,7 @@ def generate(seed: int, n_entities: int = 200, n_days: int = 500, out_dir: Path 
                 # Sample weekly or monthly for Vendor B to differ slightly or daily
                 if d_idx % 5 != 0: # subset to reduce size
                     continue
-                val_b = base_val * (1.0 + random.normalvariate(0, 0.05))
+                val_b: float | None = base_val * (1.0 + random.normalvariate(0, 0.05))
                 if random.random() < 0.02:
                     val_b = None
                     injected_counts["nulls"] += 1
