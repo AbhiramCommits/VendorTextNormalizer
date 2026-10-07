@@ -3,6 +3,8 @@ import sys
 from pathlib import Path
 from vtn.gen import generate
 from vtn.bench import run_benchmarks
+from vtn.ingest_pandas import load_vendor_a, load_vendor_b, normalize_schema
+from vtn.resolve import build_crosswalk, resolution_report, build_panel
 
 def main():
     parser = argparse.ArgumentParser(description="VendorTextNormalizer CLI")
@@ -34,7 +36,13 @@ def main():
         run_benchmarks()
         print("Ingest & benchmark complete.")
     elif args.command == "resolve":
-        print("Running resolve...")
+        print("Running entity resolution & panel construction...")
+        df_a = normalize_schema(load_vendor_a(Path("data/raw/vendor_a.parquet")), "vendor_a")
+        df_b = normalize_schema(load_vendor_b(Path("data/raw/vendor_b.jsonl")), "vendor_b")
+        cw = build_crosswalk(df_a, df_b)
+        rep = resolution_report(cw, df_a, df_b)
+        panel = build_panel(df_a, df_b, cw)
+        print(f"Resolution complete: match_rate={rep['match_rate']}, panel_rows={len(panel)}")
     elif args.command == "features":
         print("Running features...")
     elif args.command == "qc":
@@ -49,7 +57,12 @@ def main():
         print(f"Running all with seed={args.seed}...")
         generate(seed=args.seed)
         run_benchmarks()
-        print("All steps completed.")
+        df_a = normalize_schema(load_vendor_a(Path("data/raw/vendor_a.parquet")), "vendor_a")
+        df_b = normalize_schema(load_vendor_b(Path("data/raw/vendor_b.jsonl")), "vendor_b")
+        cw = build_crosswalk(df_a, df_b)
+        resolution_report(cw, df_a, df_b)
+        build_panel(df_a, df_b, cw)
+        print("All steps completed successfully.")
     else:
         parser.print_help()
         sys.exit(1)
