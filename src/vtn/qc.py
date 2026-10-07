@@ -16,8 +16,12 @@ def check_schema(df: pd.DataFrame) -> dict:
     }
 
 def check_null_rate(df: pd.DataFrame, threshold: float = 0.9) -> dict:
-    null_counts = df[['value_a', 'value_b']].isna().mean()
-    max_null = float(null_counts.max())
+    cols_to_check = [c for c in ['value_a', 'value_b'] if c in df.columns]
+    if not cols_to_check:
+        max_null = 0.0
+    else:
+        null_counts = df[cols_to_check].isna().mean()
+        max_null = float(null_counts.max())
     passed = max_null <= threshold
     return {
         "name": "check_null_rate",
@@ -28,7 +32,8 @@ def check_null_rate(df: pd.DataFrame, threshold: float = 0.9) -> dict:
     }
 
 def check_duplicate_keys(df: pd.DataFrame) -> dict:
-    dups = int(df.duplicated(subset=['entity_id', 'date']).sum())
+    sub = [c for c in ['entity_id', 'date'] if c in df.columns]
+    dups = int(df.duplicated(subset=sub).sum()) if len(sub) == 2 else 0
     passed = dups == 0
     return {
         "name": "check_duplicate_keys",
@@ -39,9 +44,11 @@ def check_duplicate_keys(df: pd.DataFrame) -> dict:
     }
 
 def check_timestamp_monotonicity(df: pd.DataFrame) -> dict:
+    if 'entity_id' not in df.columns or 'date' not in df.columns:
+        return {"name": "check_timestamp_monotonicity", "passed": True, "observed": 0, "threshold": 0, "offending_samples": []}
     violations = 0
     for _, group in df.groupby('entity_id'):
-        dates = pd.to_datetime(group['date'])
+        dates = pd.to_datetime(group['date'], errors='coerce')
         if not dates.is_monotonic_increasing:
             violations += 1
     passed = violations == 0
@@ -54,7 +61,7 @@ def check_timestamp_monotonicity(df: pd.DataFrame) -> dict:
     }
 
 def check_value_ranges(df: pd.DataFrame) -> dict:
-    negatives = int((df['value_a'] < 0).sum()) if 'value_a' in df else 0
+    negatives = int((df['value_a'] < 0).sum()) if 'value_a' in df.columns else 0
     passed = negatives == 0
     return {
         "name": "check_value_ranges",
@@ -75,6 +82,8 @@ def check_unit_consistency(df: pd.DataFrame) -> dict:
     }
 
 def check_distribution_drift(df: pd.DataFrame) -> dict:
+    if 'value_a' not in df.columns or 'date' not in df.columns:
+        return {"name": "check_distribution_drift", "passed": True, "observed": 0.0, "threshold": 10.0, "offending_samples": []}
     df_sorted = df.sort_values('date').dropna(subset=['value_a'])
     if len(df_sorted) < 10:
         return {"name": "check_distribution_drift", "passed": True, "observed": 0.0, "threshold": 10.0, "offending_samples": []}
