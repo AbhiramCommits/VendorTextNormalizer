@@ -1,0 +1,13 @@
+data/raw/
+data/interim/
+data/out/
+.venv/
+__pycache__/
+*.parquet
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+.DS_Store

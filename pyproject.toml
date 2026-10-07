@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vendor-text-normalizer"
+version = "0.1.0"
+description = "Ingests messy public vendor feeds, normalizes, extracts features, runs QC, and reports discrepancies."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Data Engineering Team" }]
+dependencies = [
+    "pandas>=2.0.0",
+    "polars>=0.19.0",
+    "pyarrow>=12.0.0",
+    "numpy>=1.24.0",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.optional-dependencies]
+nlp = [
+    "spacy>=3.5.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["vtn*"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
