@@ -1,12 +1,18 @@
 import argparse
 import sys
+from pathlib import Path
+from vtn.gen import generate
 
 def main():
     parser = argparse.ArgumentParser(description="VendorTextNormalizer CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # Subcommands
-    subparsers.add_parser("gen", help="Generate raw vendor feeds")
+    gen_parser = subparsers.add_parser("gen", help="Generate raw vendor feeds")
+    gen_parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    gen_parser.add_argument("--entities", type=int, default=200, help="Number of entities")
+    gen_parser.add_argument("--days", type=int, default=500, help="Number of days")
+
     subparsers.add_parser("ingest", help="Ingest raw feeds")
     subparsers.add_parser("resolve", help="Entity resolution and crosswalk")
     subparsers.add_parser("features", help="Extract text and numeric features")
@@ -18,7 +24,9 @@ def main():
     args = parser.parse_args()
 
     if args.command == "gen":
-        print("Running gen...")
+        print(f"Generating raw feeds with seed={args.seed}...")
+        res = generate(seed=args.seed, n_entities=args.entities, n_days=args.days)
+        print(f"Generated successfully: {res}")
     elif args.command == "ingest":
         print("Running ingest...")
     elif args.command == "resolve":
@@ -32,7 +40,9 @@ def main():
     elif args.command == "bench":
         print("Running bench...")
     elif args.command == "all":
-        print("Running all...")
+        print(f"Running all with seed={args.seed}...")
+        generate(seed=args.seed)
+        print("All steps completed.")
     else:
         parser.print_help()
         sys.exit(1)
