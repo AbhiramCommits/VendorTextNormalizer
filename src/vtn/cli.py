@@ -5,6 +5,7 @@ from vtn.gen import generate
 from vtn.bench import run_benchmarks
 from vtn.ingest_pandas import load_vendor_a, load_vendor_b, normalize_schema
 from vtn.resolve import build_crosswalk, resolution_report, build_panel
+from vtn.text_features import attach_to_panel
 
 def main():
     parser = argparse.ArgumentParser(description="VendorTextNormalizer CLI")
@@ -44,7 +45,9 @@ def main():
         panel = build_panel(df_a, df_b, cw)
         print(f"Resolution complete: match_rate={rep['match_rate']}, panel_rows={len(panel)}")
     elif args.command == "features":
-        print("Running features...")
+        print("Extracting textual features & joining to panel...")
+        summary = attach_to_panel()
+        print(f"Features complete: {summary}")
     elif args.command == "qc":
         print("Running qc...")
     elif args.command == "report":
@@ -62,6 +65,7 @@ def main():
         cw = build_crosswalk(df_a, df_b)
         resolution_report(cw, df_a, df_b)
         build_panel(df_a, df_b, cw)
+        attach_to_panel()
         print("All steps completed successfully.")
     else:
         parser.print_help()
