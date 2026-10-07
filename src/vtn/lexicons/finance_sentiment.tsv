@@ -1,4 +1,33 @@
-positive	growth	robust	smooth	solid
-negative	weakness	uncertain	failed	headwinds	risk	exposure	loss	litigation
-uncertainty	uncertain	unclear	volatile	risk	maybe
-litigious	litigation	legal	exposure	dispute	lawsuit
+positive	growth
+positive	robust
+positive	smooth
+positive	solid
+positive	strong
+positive	confidence
+positive	healthy
+positive	improve
+positive	improved
+positive	achieved
+positive	delivered
+negative	weakness
+negative	uncertain
+negative	failed
+negative	headwinds
+negative	risk
+negative	exposure
+negative	loss
+negative	losses
+negative	declined
+negative	impairment
+negative	disruption
+negative	disruptions
+negative	weakening
+uncertainty	uncertain
+uncertainty	volatile
+uncertainty	cannot
+uncertainty	may
+uncertainty	outlook
+litigious	litigation
+litigious	legal
+litigious	dispute
+litigious	lawsuit

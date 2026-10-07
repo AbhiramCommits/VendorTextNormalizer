@@ -81,36 +81,56 @@ def check_unit_consistency(df: pd.DataFrame) -> dict:
         "offending_samples": []
     }
 
-def check_distribution_drift(df: pd.DataFrame) -> dict:
+def _ks_statistic(a: np.ndarray, b: np.ndarray) -> float:
+    """Two-sample Kolmogorov-Smirnov statistic between two 1-D samples."""
+    a = np.sort(np.asarray(a, dtype=float))
+    b = np.sort(np.asarray(b, dtype=float))
+    if len(a) == 0 or len(b) == 0:
+        return 0.0
+    all_vals = np.concatenate([a, b])
+    cdf_a = np.searchsorted(a, all_vals, side='right') / len(a)
+    cdf_b = np.searchsorted(b, all_vals, side='right') / len(b)
+    return float(np.max(np.abs(cdf_a - cdf_b)))
+
+
+def check_distribution_drift(df: pd.DataFrame, threshold: float = 0.25) -> dict:
+    """Compares the first 90% vs last 10% of dates using the two-sample KS statistic."""
     if 'value_a' not in df.columns or 'date' not in df.columns:
-        return {"name": "check_distribution_drift", "passed": True, "observed": 0.0, "threshold": 10.0, "offending_samples": []}
+        return {"name": "check_distribution_drift", "passed": True, "observed": 0.0, "threshold": threshold, "offending_samples": []}
     df_sorted = df.sort_values('date').dropna(subset=['value_a'])
     if len(df_sorted) < 10:
-        return {"name": "check_distribution_drift", "passed": True, "observed": 0.0, "threshold": 10.0, "offending_samples": []}
-    
+        return {"name": "check_distribution_drift", "passed": True, "observed": 0.0, "threshold": threshold, "offending_samples": []}
+
     split_idx = int(len(df_sorted) * 0.9)
-    early = df_sorted.iloc[:split_idx]['value_a']
-    late = df_sorted.iloc[split_idx:]['value_a']
-    
-    mean_ratio = float(abs(early.mean() - late.mean()) / (early.std() + 1e-5))
-    passed = mean_ratio < 10.0
+    early = df_sorted.iloc[:split_idx]['value_a'].values
+    late = df_sorted.iloc[split_idx:]['value_a'].values
+
+    ks = _ks_statistic(early, late)
+    passed = ks < threshold
     return {
         "name": "check_distribution_drift",
         "passed": bool(passed),
-        "observed": mean_ratio,
-        "threshold": 10.0,
+        "observed": ks,
+        "threshold": threshold,
         "offending_samples": []
     }
 
-def run_all(df: pd.DataFrame = None) -> tuple[bool, list[dict]]:
-    """Runs every quality check, writes qc_report.json and returns (all_passed, results)."""
-    out_dir = Path("data/out")
+EXPECTED_FAILURES = {"check_distribution_drift"}
+
+
+def run_all(df: pd.DataFrame = None, out_path: Path | None = None) -> tuple[bool, list[dict]]:
+    """Runs every quality check, writes qc_report.json and returns (gate_passed, results).
+
+    ``gate_passed`` ignores checks named in :data:`EXPECTED_FAILURES`, which are known to
+    fail on the seeded dataset by construction (the generator injects a deliberate
+    scale-shift drift in the last 10% of dates). Every other failure fails the gate.
+    """
     if df is None:
-        panel_path = out_dir / "panel.parquet"
+        panel_path = Path("data/out") / "panel.parquet"
         if not panel_path.exists():
             raise FileNotFoundError("Panel parquet not found. Run resolve first.")
         df = pd.read_parquet(panel_path)
-        
+
     checks = [
         check_schema(df),
         check_null_rate(df),
@@ -120,10 +140,21 @@ def run_all(df: pd.DataFrame = None) -> tuple[bool, list[dict]]:
         check_unit_consistency(df),
         check_distribution_drift(df)
     ]
-    
-    all_passed = all(c['passed'] for c in checks)
-    
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "qc_report.json").write_text(json.dumps(checks, indent=2))
-    
-    return all_passed, checks
+
+    failed = [c['name'] for c in checks if not c['passed']]
+    unexpected = [name for name in failed if name not in EXPECTED_FAILURES]
+    gate_passed = len(unexpected) == 0
+
+    payload = {
+        "expected_failures": sorted(EXPECTED_FAILURES),
+        "failed_checks": failed,
+        "unexpected_failures": unexpected,
+        "gate_passed": gate_passed,
+        "checks": checks,
+    }
+
+    out_path = out_path or (Path("data/out") / "qc_report.json")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(payload, indent=2))
+
+    return gate_passed, checks

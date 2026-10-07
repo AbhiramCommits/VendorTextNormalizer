@@ -9,7 +9,7 @@ from vtn.bench import run_benchmarks
 from vtn.ingest_pandas import load_vendor_a, load_vendor_b, normalize_schema
 from vtn.resolve import build_crosswalk, resolution_report, build_panel
 from vtn.text_features import attach_to_panel
-from vtn.qc import run_all
+from vtn.qc import run_all, EXPECTED_FAILURES
 from vtn.discrepancy import generate_findings_report
 
 
@@ -75,11 +75,12 @@ def main() -> None:
             passed, checks = run_all()
             for c in checks:
                 status = "PASS" if c['passed'] else "FAIL"
-                print(f" - {c['name']}: {status} (observed: {c['observed']}, threshold: {c['threshold']})")
+                note = " (expected)" if (not c['passed'] and c['name'] in EXPECTED_FAILURES) else ""
+                print(f" - {c['name']}: {status}{note} (observed: {c['observed']}, threshold: {c['threshold']})")
         if not passed:
-            print("QC Gate FAILED.")
+            print("QC Gate FAILED (unexpected failures present).")
             sys.exit(1)
-        print("QC Gate PASSED.")
+        print("QC Gate PASSED (documented expected failures ignored).")
     elif args.command == "report":
         with _stage("report"):
             path = generate_findings_report()

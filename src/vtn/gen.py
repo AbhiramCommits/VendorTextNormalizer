@@ -4,9 +4,74 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, List
 
+# Sentence pools used to compose 150-600 word filing-style narratives. The pools
+# deliberately contain negations, hedges and sentiment-bearing terms so the text
+# pipeline has signal to extract.
+_POSITIVE_SENTENCES = [
+    "The company reported robust revenue growth during the period and solid demand across segments.",
+    "Management expressed confidence in the strong performance of core operations.",
+    "Operating margins remained solid and the balance sheet stayed healthy.",
+    "We delivered solid growth across all major business segments this quarter.",
+    "The quarter reflected smooth execution and strong customer demand.",
+]
+_NEGATED_POSITIVE_SENTENCES = [
+    "The company did not report growth in the quarter.",
+    "Management did not observe solid performance in core operations.",
+    "We did not experience robust demand during the period.",
+    "The segment did not achieve smooth execution this quarter.",
+    "The company did not deliver growth across major segments.",
+]
+_NEGATIVE_SENTENCES = [
+    "The company faced significant headwinds from supply chain disruptions.",
+    "We recorded an impairment charge and litigation exposure increased.",
+    "Operating losses widened and revenue declined in the period.",
+    "Management identified a material weakness in internal controls.",
+    "The business encountered substantial risk and weakening demand.",
+]
+_HEDGE_SENTENCES = [
+    "Management remains uncertain about the macroeconomic outlook.",
+    "Future results may be volatile and are difficult to predict.",
+    "We cannot be certain whether these trends will continue.",
+    "There is no assurance that current conditions will persist.",
+]
+_NEUTRAL_SENTENCES = [
+    "The company operates in multiple geographic regions.",
+    "The filing describes the company's business and material risk factors.",
+    "Management discussed the results of operations for the period.",
+    "The report covers the company's financial position and cash flows.",
+    "We describe below the principal segments and their recent developments.",
+]
+
+
+def _compose_body(entity_name: str, rng: random.Random, seed_text: str) -> str:
+    """Composes a 150-600 word filing-style narrative from the sentence pools.
+
+    Args:
+        entity_name: Company name spliced into the opening sentence.
+        rng: Seeded random generator for deterministic composition.
+        seed_text: Additional sentence content (e.g. quarter label) for the opener.
+
+    Returns:
+        A narrative body whose word count is between 150 and 600.
+    """
+    opening = f"{entity_name} filed this quarterly report covering {seed_text}."
+    pool = (
+        _POSITIVE_SENTENCES
+        + _NEGATED_POSITIVE_SENTENCES
+        + _NEGATIVE_SENTENCES
+        + _HEDGE_SENTENCES
+        + _NEUTRAL_SENTENCES
+    )
+    parts = [opening]
+    while len(" ".join(parts).split()) < 150:
+        parts.append(rng.choice(pool))
+    return " ".join(parts)
+
+
 def generate(seed: int, n_entities: int = 200, n_days: int = 500, out_dir: Path = Path("data/raw")) -> Dict[str, Any]:
     """Generates synthetic messy vendor feeds (Vendor A CSV/Parquet, Vendor B JSONL, Vendor C JSONL) and injection truth."""
     random.seed(seed)
+    rng = random.Random(seed)
     out_dir.mkdir(parents=True, exist_ok=True)
     
     start_date = datetime(2022, 1, 3)
@@ -181,17 +246,11 @@ def generate(seed: int, n_entities: int = 200, n_days: int = 500, out_dir: Path 
                     ("2023-03-31", "Q1 2023"), ("2023-06-30", "Q2 2023"), ("2023-09-30", "Q3 2023"), ("2023-12-31", "Q4 2023")]
         
         for q_date, q_label in quarters:
-            text_bodies = [
-                f"During {q_label}, {ent['base_name']} did not improve operating margins, and we observed no material weakness in internal controls, although management remains uncertain about future growth.",
-                f"{ent['base_name']} achieved solid revenue growth this quarter. However, supply chain bottlenecks failed to resolve completely, leading to litigation risks.",
-                f"We did not experience significant headwinds. The company reported robust performance without any material weakness. Operations proceeded smoothly.",
-                f"Management noted that previous forecasts were overly optimistic. Results failed to meet expectations, creating uncertainty and potential legal exposure."
-            ]
-            body = random.choice(text_bodies)
+            body = _compose_body(ent['base_name'], rng, q_label)
             
             # Unicode / em-dash / smart-quote artifacts
             if random.random() < 0.3:
-                body = body.replace("", "“").replace("", "”").replace("--", "—")
+                body = body.replace("'", "’").replace("--", "—")
                 injected_counts["unicode_artifacts"] += 1
 
             vendor_c_rows.append({

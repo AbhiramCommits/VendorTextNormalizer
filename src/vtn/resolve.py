@@ -105,7 +105,7 @@ def build_crosswalk(df_a: pd.DataFrame, df_b: pd.DataFrame, threshold: float = 0
             
     return pd.DataFrame(matches)
 
-def resolution_report(crosswalk_df: pd.DataFrame, df_a: pd.DataFrame, df_b: pd.DataFrame) -> dict:
+def resolution_report(crosswalk_df: pd.DataFrame, df_a: pd.DataFrame, df_b: pd.DataFrame, out_path: Path | None = None) -> dict:
     """Computes match rate, per-method breakdown, residual counts and precision/recall; writes resolution.json."""
     total_a = crosswalk_df['vendor_a_key'].nunique()
     matched = crosswalk_df[crosswalk_df['vendor_b_key'].notna()]
@@ -143,9 +143,9 @@ def resolution_report(crosswalk_df: pd.DataFrame, df_a: pd.DataFrame, df_b: pd.D
         "resolution_recall": round(recall, 4)
     }
     
-    out_dir = Path("data/out")
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "resolution.json").write_text(json.dumps(report, indent=2))
+    out_path = out_path or (Path("data/out") / "resolution.json")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(report, indent=2))
     return report
 
 def build_panel(df_a: pd.DataFrame, df_b: pd.DataFrame, crosswalk_df: pd.DataFrame) -> pd.DataFrame:

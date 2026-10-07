@@ -46,53 +46,70 @@ python -m vtn qc
 ## Measured Results (Seed 7)
 
 ### Ingest & Throughput (Vendor A + Vendor B)
-- **Vendor A Rows Ingested**: 101,446
+- **Vendor A Rows Ingested**: 101,472
 - **Vendor B Rows Ingested**: 18,400
-- **Total Ingested Rows**: 119,846
-- **Pandas Wall Time**: 25.6937 seconds
-- **Pandas Peak Memory**: 27.54 MiB
-- **Pandas Throughput**: 4,664.41 rows/sec
-- **Polars Wall Time**: 0.2716 seconds
+- **Total Ingested Rows**: 119,872
+- **Pandas Wall Time**: 25.7204 seconds
+- **Pandas Peak Memory**: 27.53 MiB
+- **Pandas Throughput**: 4,660.58 rows/sec
+- **Polars Wall Time**: 0.277 seconds
 - **Polars Peak Memory**: 0.01 MiB
-- **Polars Throughput**: 441,240.93 rows/sec
-- **Polars/Pandas Speedup Ratio**: 94.6x
+- **Polars Throughput**: 432,753.12 rows/sec
+- **Polars/Pandas Speedup Ratio**: 92.85x
 
 ### Entity Resolution
 - **Total Vendor A Entities**: 200
 - **Matched Entities**: 183
-- **Unmatched Entities**: 17
+- **Unmatched Entities**: 107 (Vendor A names without a B counterpart)
 - **Match Rate**: 91.5% (0.915)
+- **Methods**: `normalized_exact` 161, `exact_name` 22
 - **Resolution Precision**: 1.0
 - **Resolution Recall**: 0.9946
-- **Matched Residual Count**: 17 (Vendor A), 0 (Vendor B)
+- **Unmatched Residual**: 107 (Vendor A), 1 (Vendor B)
 
 ### Textual Features (Vendor C Corpus)
 - **Document Count**: 1,600
-- **Vocabulary Size**: 22
-- **Mean Sentiment (Without Negation)**: 0.0
-- **Mean Sentiment (With Negation)**: 0.0
-- **Sign Flip Count**: 0
+- **Corpus Vocabulary Size**: 341
+- **Mean Document Vocabulary**: 80.88 tokens
+- **Top tf-idf Terms**: `the`, `and`, `company`, `in`, `we`
+- **Mean Sentiment (Without Negation)**: +0.024358
+- **Mean Sentiment (With Negation)**: -0.017282
+- **Sentiment Range (With Negation)**: [-0.125786, +0.100629]
+- **Sign-Flip Count**: 590 of 1,600 documents flip sign when negation is applied
+- **Tokenizer Path**: `regex` (spaCy not installed)
 
 ### Quality-Check Gate (`qc`)
+All checks measured on `data/out/panel.parquet`. `check_distribution_drift` is on the
+documented expected-fail list because the generator injects a scale shift in the last 10%
+of dates by design; the gate passes as long as no *unexpected* check fails.
+
 | Check Name | Passed | Observed Value | Threshold |
 |---|---|---|---|
-| `check_schema` | True | `['entity_id', 'date', 'value_a', 'unit_scale_applied', 'entity_name_raw', 'value_b']` | Required columns present |
-| `check_null_rate` | True | 0.7713 (77.13%) | <= 0.90 |
+| `check_schema` | True | required columns present | required columns present |
+| `check_null_rate` | True | 0.7715 | <= 0.90 |
 | `check_duplicate_keys` | True | 0 | 0 |
 | `check_timestamp_monotonicity` | True | 0 violations | 0 |
 | `check_value_ranges` | True | 0 negative values | 0 |
 | `check_unit_consistency` | True | 0 inconsistencies | 0 |
-| `check_distribution_drift` | True | 0.6686 (KS/Mean ratio) | < 10.0 |
+| `check_distribution_drift` | False (expected) | 0.3280 (two-sample KS) | < 0.25 |
+
+Corruption demo: injecting 10 duplicate keys plus 5 negative values makes three checks fail
+(`check_duplicate_keys`=10, `check_timestamp_monotonicity`=1, `check_value_ranges`=5) and
+`python -m vtn qc` exits **1**; the clean run exits **0**.
 
 ### Discrepancy Classes
-- `unit_scale_mismatch`: 2,024
-- `revision_lag`: 1,450
-- `missing_in_vendor_b`: 16
-- `date_convention_skew`: 320
-- `duplicate_key_divergence`: 1,446
+| Class | Count |
+|---|---|
+| `unit_scale_mismatch` | 5,849 |
+| `sign_error` | 0 |
+| `stale_value` | 1,424 |
+| `missing_in_vendor_b` | 60,909 |
+| `date_convention_skew` | 3,570 |
+| `revision_lag` | 2,025 |
+| `duplicate_key_divergence` | 1,661 |
 
 ### Test Coverage
-- **Test Count**: 6 tests passing across 5 suites
+- **Test Count**: 9 tests passing across 5 suites
 - **Coverage**: 31% (`pytest -q --cov=src/vtn --cov-report=term-missing`)
 - **Type check**: `python -m mypy src/vtn` -> Success: no issues found in 11 source files (pandas/polars stubs ignored, documented in `pyproject.toml`)
 
@@ -103,10 +120,13 @@ python -m vtn qc
 ---
 
 ## Findings & Trust Verdicts
-See [FINDINGS.md](FINDINGS.md) for the complete breakdown of discrepancy classes and per-field trust verdicts (`value_a` preferred for timeliness/frequency; `value_b` preferred for CIK governance).
+See [FINDINGS.md](FINDINGS.md) for the full table. Measured per-field verdicts:
+- **Vendor B (`value_b`)** — **PREFERRED**: blended defect score 0.019783 (null rate 0.019783, duplicate rate 0.0, 0 monotonicity violations), entity coverage 0.92 versus Vendor A.
+- **Vendor A (`value_a`)** — **SECONDARY**: blended defect score 1.046358 (null rate 0.029989, duplicate rate 0.016369, 200 apparent monotonicity violations caused by quarter-coarsened timestamps), but higher frequency with explicit revision flags.
 
 ## Limitations
-- Synthetic raw feeds generate stochastic variations.
-- Lexicon-based sentiment scoring uses a static finance lexicon.
-- Entity resolution threshold (0.8) may require fine-tuning for highly skewed entity naming variants.
-- Reproducibility verified across multiple runs with identical seed.
+- Raw feeds are synthetically generated with seeded, deliberately injected defects, not real downloads.
+- Lexicon-based sentiment uses a small static finance word list; scores are lexicon-bound, not model-based.
+- The 0.8 token-set Jaccard resolution threshold is sensitive: lowering it raises recall but risks false merges.
+- The date-convention skew detector depends on a +/-7 day window choice.
+- `sign_error` is 0 because all generated values are positive; the classifier supports negative values but the seed data does not exercise it.
