@@ -49,13 +49,13 @@ python -m vtn qc
 - **Vendor A Rows Ingested**: 101,472
 - **Vendor B Rows Ingested**: 18,400
 - **Total Ingested Rows**: 119,872
-- **Pandas Wall Time**: 25.7204 seconds
+- **Pandas Wall Time**: 25.3937 seconds
 - **Pandas Peak Memory**: 27.53 MiB
-- **Pandas Throughput**: 4,660.58 rows/sec
-- **Polars Wall Time**: 0.277 seconds
+- **Pandas Throughput**: 4,720.53 rows/sec
+- **Polars Wall Time**: 0.2739 seconds
 - **Polars Peak Memory**: 0.01 MiB
-- **Polars Throughput**: 432,753.12 rows/sec
-- **Polars/Pandas Speedup Ratio**: 92.85x
+- **Polars Throughput**: 437,639.52 rows/sec
+- **Polars/Pandas Speedup Ratio**: 92.71x
 
 ### Entity Resolution
 - **Total Vendor A Entities**: 200
