@@ -27,5 +27,9 @@ jobs:
       run: python -m vtn gen --seed 7
     - name: Run tests with pytest-cov
       run: pytest -q --cov=src/vtn --cov-report=term-missing
+    - name: Resolve entities and build panel
+      run: python -m vtn resolve
+    - name: Extract text features
+      run: python -m vtn features
     - name: Run quality check gate
       run: python -m vtn qc
